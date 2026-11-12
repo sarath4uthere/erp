@@ -1,0 +1,15 @@
+extends:
+  - spectral:oas
+
+rules:
+  # Every operation must be addressable by generated clients and contract tests.
+  operation-operationId: error
+  operation-tags: error
+  oas3-api-servers: error
+  info-contact: error
+  info-description: error
+  # The repository licence is decided at the Phase 0 human gate.
+  info-license: off
+  # Descriptions are strongly encouraged but do not block Phase 0.
+  operation-description: warn
+  tag-description: warn
