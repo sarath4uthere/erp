@@ -220,6 +220,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
 
+      - uses: actions/setup-dotnet@v6.1.0
+        if: matrix.language == 'csharp'
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+
       - uses: github/codeql-action/init@v4.39.3
         with:
           languages: ${{ matrix.language }}
