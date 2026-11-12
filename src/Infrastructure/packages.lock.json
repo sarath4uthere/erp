@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net8.0": {
+      "minierp.application": {
+        "type": "Project",
+        "dependencies": {
+          "MiniErp.Domain": "[1.0.0, )"
+        }
+      },
+      "minierp.domain": {
+        "type": "Project"
+      }
+    }
+  }
+}
