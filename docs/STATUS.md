@@ -12,13 +12,13 @@ evidence. Do not mark a task done without tests, Security and Reviewer evidence.
 | Task | Owner | Iter | Status | Evidence |
 | :--- | :--- | :---: | :--- | :--- |
 | P0-01 Repository scaffold, PLAN.md, editor config, secrets policy | Manager / DevOps | 1 | DONE | `.gitignore`, `.editorconfig`, `.gitattributes`, `.env.example`; `docs/CONTRIBUTING.md`, `docs/SECURITY.md`, `docs/OPERATIONS.md`; `scripts/setup-dev.*`, `scripts/verify.*`; gitleaks config |
-| P0-02 Layered .NET 8 solution + health endpoint + baseline middleware | Backend | 1 | DONE | `dotnet build` 0 warnings; 17 tests green locally |
+| P0-02 Layered .NET 8 solution + health endpoint + baseline middleware | Backend | 1 | DONE | `dotnet build` 0 warnings; 11 unit + 5 API/host tests green locally; SQL Testcontainers test gated to CI |
 | P0-03 React + TypeScript + Vite SPA with health states | Frontend | 1 | DONE | lint, typecheck, 5 tests, build green; coverage 86.84% lines |
 | P0-04 Docker Compose (SQL Server + API + web), non-root images | DevOps | 1 | DONE (static) | `docker compose config --quiet` green; image build/scan deferred to CI (no local engine) |
 | P0-05 CI: build, tests, lint, SAST, dependency, secret and image scans | DevOps / Security | 1 | AUTHORED — first run pending push | `.github/workflows/ci.yml`; local equivalents green |
 | P0-06 ADRs 0001-0007 + OpenAPI skeleton | Architect | 1 | DONE | 7 ADRs; Spectral 0 errors, 13 expected unused-component warnings |
 | P0-07 STRIDE threat model | Security | 1 | DONE — human review pending | `docs/THREAT_MODEL.md` (444 lines), M-01..M-07 recorded |
-| P0-08 Phase 0 verification and gate pack | QA / Reviewer | 1 | DONE (local scope) | `scripts/verify.ps1` green: restore, build 0 warnings, format, 16 tests, lint/typecheck/coverage/build, Spectral 0 errors, audits clean, compose config valid. Container build, image scan, CodeQL and gitleaks secret scan require CI. |
+| P0-08 Phase 0 verification and gate pack | QA / Reviewer | 1 | DONE (local scope) | `scripts/verify.ps1` green: restore, build 0 warnings, format, 16 tests, lint/typecheck/coverage/build, Spectral 0 errors, audits clean, compose config valid. gitleaks 8.30.1 scanned all 8 commits: no leaks. Container build, image scan and CodeQL require CI. |
 
 ### Gate verdicts
 
@@ -42,11 +42,13 @@ evidence. Do not mark a task done without tests, Security and Reviewer evidence.
 | 2 | Governance docs and developer scripts were missing from the task board evidence. | Added `docs/CONTRIBUTING.md`, `docs/SECURITY.md`, `docs/OPERATIONS.md` (Phase 7 runbook stub with tickets), and cross-platform `scripts/setup-dev.*` / `scripts/verify.*`. |
 | 2 | First `verify.ps1` run failed: `--artifacts-path` moved the restore assets while restore/build still used default `obj`. | Apply the artifacts path to `dotnet test` only and let it build into that path; build/format stay on the default tree. Script green. |
 | 2 | Frontend coverage had no enforced threshold. | Added an 80% line threshold to `web/vite.config.ts`; measured 86.84% lines. Thresholds for branches/functions remain a Phase 1+ decision when business UI logic exists. |
+| 2 | Phase 0 work was uncommitted, so task traceability and the history secret scan were untestable. | Created 8 task-referenced commits (`P0-01`..`P0-08`) on `main`; executable bits set on hook and shell scripts. gitleaks scanned all commits: no leaks. |
 
 ## Phase 0 exit checklist
 
 - [x] Repository structure and solution layout match PLAN.md.
-- [x] `.editorconfig`, `.gitattributes`, `.gitignore`, `.env.example`; no real secrets tracked.
+- [x] `.editorconfig`, `.gitattributes`, `.gitignore`, `.env.example`; no real secrets tracked; gitleaks clean across commit history.
+- [x] Work is committed as 8 task-referenced commits (`P0-01`..`P0-08`).
 - [x] Docker Compose defines SQL Server 2022, API and web with health checks and non-root runtime images.
 - [x] CI workflow contains build, tests, format, lint, CodeQL, gitleaks, NuGet/npm audits, Trivy fs+image, Spectral, compose validation, and a single `CI gate` job.
 - [x] ADRs: stack, auth model, audit, money/decimal, soft delete, database access, API contract.
