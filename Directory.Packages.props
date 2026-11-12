@@ -14,7 +14,7 @@
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.34" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
     <!-- Transitive via Microsoft.Data.SqlClient 7.1.1; 8.0.1 has high-severity advisories. -->
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
