@@ -1,0 +1,316 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+  security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  NODE_VERSION: "24"
+
+jobs:
+  backend:
+    name: Backend build, format and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Format check
+        run: dotnet format MiniErp.sln --verify-no-changes --no-restore --verbosity minimal
+
+      - name: Unit and API tests
+        run: >
+          dotnet test MiniErp.sln
+          --no-build
+          --configuration Release
+          --filter "Category!=Integration"
+          --logger "trx;LogFileName=tests.trx"
+          --collect "XPlat Code Coverage"
+          --results-directory "${{ runner.temp }}/test-results"
+
+      - name: Upload test and coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: backend-test-results
+          path: ${{ runner.temp }}/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  integration:
+    name: Integration tests (real SQL Server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Testcontainers SQL Server tests
+        env:
+          RUN_INTEGRATION_TESTS: "true"
+        run: >
+          dotnet test tests/IntegrationTests/MiniErp.IntegrationTests.csproj
+          --no-build
+          --configuration Release
+          --filter "Category=Integration"
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory "${{ runner.temp }}/integration-results"
+
+      - name: Upload integration results
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: integration-test-results
+          path: ${{ runner.temp }}/integration-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  frontend:
+    name: Frontend lint, types, tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install (lockfile)
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: frontend-coverage
+          path: web/coverage
+          if-no-files-found: ignore
+          retention-days: 14
+
+  security:
+    name: Secrets, dependencies and filesystem scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git --redact --verbose --config .gitleaks.toml
+
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: NuGet vulnerability audit
+        run: |
+          dotnet list MiniErp.sln package --vulnerable --include-transitive --format json > nuget-vulnerabilities.json
+          jq -e '
+            [ .projects[].frameworks[]
+              | ((.topLevelPackages // [])[], (.transitivePackages // [])[])
+              | select((.vulnerabilities // []) | length > 0)
+            ] | length == 0
+          ' nuget-vulnerabilities.json
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies (no scripts)
+        working-directory: web
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: npm vulnerability audit
+        working-directory: web
+        run: npm audit --audit-level=high
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-dirs: .git,node_modules,bin,obj,dist,coverage,TestResults
+          format: sarif
+          output: trivy-fs.sarif
+
+      - name: Upload filesystem SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4.39.3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: autobuild
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: github/codeql-action/init@v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v4.39.3
+
+      - uses: github/codeql-action/analyze@v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+
+  containers:
+    name: Container build and image scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Build API image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: ops/docker/Api.Dockerfile
+          load: true
+          tags: mini-erp-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build web image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: ops/docker/Web.Dockerfile
+          load: true
+          tags: mini-erp-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: mini-erp-api:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-api.sarif
+
+      - name: Scan web image
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: mini-erp-web:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-web.sarif
+
+      - name: Upload image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4.39.3
+        with:
+          sarif_file: .
+          category: trivy-images
+
+  contract:
+    name: OpenAPI and compose validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Lint OpenAPI contract
+        run: npx --yes @stoplight/spectral-cli@6.17.1 lint openapi/openapi.yaml --fail-severity=error
+
+      - name: Validate compose file
+        run: docker compose --env-file .env.example config --quiet
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [backend, integration, frontend, security, codeql, containers, contract]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "$NEEDS" | jq -e 'all(.[]; .result == "success")'
