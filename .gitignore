@@ -1,0 +1,75 @@
+# --- OS / editor -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# --- Secrets -----------------------------------------------------------------
+# Only .env.example is tracked. Never commit real credentials or keys.
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+!docs/**/*.pem
+secrets/
+appsettings.*.local.json
+appsettings.Local.json
+*.secret.json
+
+# --- .NET --------------------------------------------------------------------
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+*.trx
+project.lock.json
+project.fragment.lock.json
+*.nupkg
+*.snupkg
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+.scratch/
+
+# --- Node / web --------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+web/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+*.tsbuildinfo
+
+# --- Test / tooling output ---------------------------------------------------
+playwright-report/
+test-results/
+blob-report/
+.trivy/
+.gitleaks-report.json
+*.sarif
+
+# --- Local data --------------------------------------------------------------
+db/backups/
+*.bak
+*.mdf
+*.ldf
+*.ndf

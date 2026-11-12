@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Installed by scripts/setup-dev.* via: git config core.hooksPath .githooks
+set -eu
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --redact --config .gitleaks.toml
+else
+  echo "gitleaks not installed; skipping local secret scan (CI still enforces it)."
+fi

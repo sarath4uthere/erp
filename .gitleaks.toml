@@ -1,0 +1,15 @@
+title = "Mini-ERP secret scanning"
+description = "Extends gitleaks defaults; only clearly fake dev placeholders are allowed."
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The example environment file contains development placeholders only."
+paths = ['''(^|/)\.env\.example$''']
+
+[[allowlists]]
+description = "Threat model and docs may quote placeholder header names, never real values."
+paths = ['''(^|/)docs/''']
+regexTarget = "match"
+regexes = ['''dev-only-''']
