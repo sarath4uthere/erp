@@ -1,0 +1,21 @@
+# Keep the build context small and free of secrets/artifacts.
+.git
+.github
+.vs
+.idea
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/coverage
+**/TestResults
+**/*.user
+**/*.trx
+.env
+.env.*
+!.env.example
+docs
+tests
+db/backups
+*.md
+!README.md
