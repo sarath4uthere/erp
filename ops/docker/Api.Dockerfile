@@ -20,7 +20,7 @@ RUN dotnet publish src/Api/MiniErp.Api.csproj \
         /p:UseAppHost=false
 
 # ---- runtime ----------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 WORKDIR /app
 
 # curl is used only for the container health probe; the runtime image is minimal.
